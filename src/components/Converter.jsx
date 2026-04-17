@@ -1,7 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef,useEffect } from "react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
-import { useEffect } from "react";
 
 const FORMAT_MAP = {
   'video/mp4': { formats: ['mp4', 'mkv', 'mov', 'avi', 'mp3', 'gif'], engine: 'ffmpeg' },
@@ -9,8 +8,10 @@ const FORMAT_MAP = {
   'audio/mpeg': { formats: ['mp3', 'wav', 'ogg', 'aac', 'flac'], engine: 'ffmpeg' },
   'audio/wav': { formats: ['wav', 'mp3', 'ogg', 'flac'], engine: 'ffmpeg' },
   'image/gif': { formats: ['mp4', 'webp', 'png'], engine: 'ffmpeg' },
-  'image/png': { formats: ['webp', 'jpg'], engine: 'squoosh' },
-  'application/pdf': { formats: ['jpg', 'png'], engine: 'pdf-lib' }
+  'image/png': { formats: ['webp', 'jpg'], engine: 'canvas' },
+  'image/jpeg': { formats: ['webp', 'png'], engine: 'canvas' },
+  'image/webp': { formats: ['jpg', 'png'], engine: 'canvas' },
+  'application/pdf': { formats: ['jpg', 'png'], engine: 'pdfjs' }
 };
 
 const Converter = () => {
@@ -80,26 +81,65 @@ const loadSpecificEngine = async (type) => {
       setLoadingMsg("Yükleme başarısız ❌");
     }
   }
+  else if(type==="canvas"){
+    setActiveEngine("canvas");
+    setLoadingMsg("Resim Motoru Hazır! 🖼️ (Native Edge)");
+  }
+else if (type === "pdfjs") {
+      try {
+        const scripts = [
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+        ];
+
+        for (const src of scripts) {
+          if (!document.querySelector(`script[src="${src}"]`)) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = false;
+            document.body.appendChild(script);
+          }
+        }
+        setTimeout(() => {
+          if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            setActiveEngine("pdfjs");
+            setLoadingMsg("PDF & ZIP Motoru Hazır! 📄📦");
+          }
+        }, 1000);
+      } catch {
+        setLoadingMsg("PDF Motoru yüklenemedi ❌");
+      }
+    }
 };
-  const handleFileChange = (e) => {
+const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (!selectedFile) return;
+
     setFile(selectedFile);
+    setProcessing(false);
+    setProgress(0);
+    setStatus("");
+
     const type = selectedFile.type;
-    let config = FORMAT_MAP[type];
     const inputExtension = selectedFile.name.split('.').pop().toLowerCase();
+    let config = FORMAT_MAP[type];
     if (!config) {
-    if (type.startsWith('video/') || type.startsWith('audio/')) {
-      config = { formats: ['mp4', 'mp3'], engine: 'ffmpeg' };
-    } else {
-      alert("Üzgünüm, bu dosya türünü desteklemiyoruz (Resim, Video veya Ses olmalı).");
-      setFile(null);
-      return; 
+      if (type.startsWith('video/') || type.startsWith('audio/')) {
+        config = { formats: ['mp4', 'mkv', 'mp3'], engine: 'ffmpeg' };
+      } else if (type.startsWith('image/')) {
+        config = { formats: ['webp', 'jpg', 'png'], engine: 'canvas' };
+      } else if (type === 'application/pdf') {
+        config = { formats: ['jpg', 'png'], engine: 'pdfjs' };
+      } else {
+        alert("Üzgünüm, bu dosya türünü desteklemiyoruz.");
+        setFile(null);
+        return; 
+      }
     }
-  }
-  const filteredFormats = config.formats.filter(fmt => fmt !== inputExtension);
+    const filteredFormats = config.formats.filter(fmt => fmt !== inputExtension);
     setAllowedFormats(filteredFormats);
-    setSelectedOutput(filteredFormats[0]);
+    setSelectedOutput(filteredFormats[0] || "");
     loadSpecificEngine(config.engine);
   };
 const convertFile = async () => {
@@ -108,72 +148,136 @@ const convertFile = async () => {
   setProcessing(true);
   setProgress(0);
   setStatus("Processing");
+  
   const ffmpeg = ffmpegRef.current;
-  let inputName='';
-  let outputName='';
+  let inputName = '';
+  let outputName = '';
+  
   try {
-    
     const cleanFileName = file.name.replace(/[^\w.-]/g, '_');
-    inputName = `input_${cleanFileName}`;
+    inputName = `input_${Date.now()}_${cleanFileName}`;
     outputName = `output_${Date.now()}.${selectedOutput}`;
-    ffmpeg.off('progress');
-    ffmpeg.on('progress', ({ progress }) => {
-      if (progress >= 0 && progress <= 1) {
-        setProgress(Math.round(progress * 100));
+
+    if (activeEngine === "ffmpeg") {
+      ffmpeg.off('progress');
+      ffmpeg.on('progress', ({ progress }) => {
+        if (progress >= 0 && progress <= 1) setProgress(Math.round(progress * 100));
+      });
+      
+      console.log("Dosya yazılıyor...");
+      await ffmpeg.writeFile(inputName, await fetchFile(file));
+      
+      let command = [];
+      if (selectedOutput === 'png' || selectedOutput === 'jpg') {
+        command = ['-i', inputName, '-vframes', '1', outputName];
+      } else if (selectedOutput === 'gif') {
+        command = ['-i', inputName, '-vf', 'fps=10,scale=320:-1:flags=lanczos', outputName];
+      } else {
+        command = ['-i', inputName, outputName];
       }
-    });
-    console.log("Dosya yazılıyor...");
-    await ffmpeg.writeFile(inputName, await fetchFile(file));
-    let command = [];
-    if (selectedOutput === 'gif') {
-      command = [
-        '-i', inputName,
-        '-vf', 'fps=10,scale=320:-1:flags=lanczos', 
-        outputName
-      ];
-    } else {
-      command = ['-i', inputName, outputName];
+      
+      console.log("FFmpeg başlatılıyor:", command);
+      const result = await ffmpeg.exec(command);
+      if (result !== 0) throw new Error("FFmpeg işlemi başarısız oldu.");
+      
+      setStatus("Downloading");
+      const data = await ffmpeg.readFile(outputName);
+      
+      let mimeType = "";
+    switch (selectedOutput) {
+      case 'gif': mimeType = 'image/gif'; break;
+      case 'mp3': mimeType = 'audio/mpeg'; break;
+      case 'png': mimeType = 'image/png'; break;
+      case 'jpg': mimeType = 'image/jpeg'; break;
+      case 'webp': mimeType = 'image/webp'; break;
+    default: mimeType = `video/${selectedOutput}`;
+  }
+      
+      const url = URL.createObjectURL(new Blob([data.buffer], { type: mimeType }));
+      triggerDownload(url, outputName);
+
+    } else if (activeEngine === "canvas") {
+      setProgress(50);
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        
+        const targetMime = selectedOutput === 'jpg' ? 'image/jpeg' : `image/${selectedOutput}`;
+        
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          triggerDownload(url, outputName);
+          setProgress(100);
+          URL.revokeObjectURL(img.src);
+        }, targetMime, 0.9);
+      };
+
+    } else if (activeEngine === "pdfjs") {
+      const fileReader = new FileReader();
+      fileReader.onload = async function() {
+        const typedarray = new Uint8Array(this.result);
+        const pdf = await window.pdfjsLib.getDocument(typedarray).promise;
+        const totalPages = pdf.numPages;
+        const zip = new window.JSZip();
+        
+        console.log(`${totalPages} sayfa işleniyor...`);
+
+        for (let i = 1; i <= totalPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          
+          await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+          const imgBlob = await new Promise(resolve => 
+            canvas.toBlob(resolve, selectedOutput === 'jpg' ? 'image/jpeg' : 'image/png', 0.9)
+          );
+          
+          zip.file(`sayfa_${i}.${selectedOutput}`, imgBlob);
+          
+          setProgress(Math.round((i / totalPages) * 100));
+        }
+
+        const zipContent = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(zipContent);
+        triggerDownload(url, `tum_sayfalar.zip`);
+        
+        setStatus("Done");
+        setProgress(100);
+      };
+      fileReader.readAsArrayBuffer(file);
     }
-    console.log("FFmpeg başlatılıyor:", command);
-    const result = await ffmpeg.exec(command);
-    if (result !== 0) {
-      throw new Error("FFmpeg işlemi başarısız oldu.");
-    }
-    setStatus("Downloading");
-    const data = await ffmpeg.readFile(outputName);
-    const mimeType = selectedOutput === 'gif' ? 'image/gif' : 
-                 selectedOutput === 'mp3' ? 'audio/mpeg' : 
-                 `video/${selectedOutput}`;
-    const url = URL.createObjectURL(new Blob([data.buffer],{type:mimeType}));
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `converted_${Date.now()}.${selectedOutput}`;
-    a.click();
-    
-    setStatus("Done");
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 1000);
-    await ffmpeg.deleteFile(inputName);
-    await ffmpeg.deleteFile(outputName);
 
   } catch (error) {
     console.error("DETAYLI HATA:", error);
     setStatus("Error");
-    alert("Dönüştürme sırasında bir hata oluştu. Lütfen dosyanın çok büyük olmadığından emin olun.");
+    alert("İşlem sırasında bir hata oluştu.");
   } finally {
     setProcessing(false);
-    const cleanupMEMFS = async () => {
-      if (inputName) {
-        try { await ffmpeg.deleteFile(inputName); } catch { /* Sessizce geç */ }
-      }
-      if (outputName) {
-        try { await ffmpeg.deleteFile(outputName); } catch { /* Sessizce geç */ }
-      }
-    };
-    await cleanupMEMFS();
+    if (activeEngine === "ffmpeg") {
+      try {
+        if (inputName) await ffmpeg.deleteFile(inputName);
+        if (outputName) await ffmpeg.deleteFile(outputName);
+      } catch { /*  */ }
+    }
   }
+};
+
+const triggerDownload = (url, filename) => {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `converted_${filename}`;
+  a.click();
+  setStatus("Done");
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
   const resetConverter = () => {
     setFile(null);

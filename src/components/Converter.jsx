@@ -72,8 +72,12 @@ const loadSpecificEngine = async (type) => {
       await ffmpeg.load({ coreURL, wasmURL, workerURL });
       setActiveEngine("ffmpeg");
       setLoadingMsg("Motor Hazır! 🚀");
+      URL.revokeObjectURL(coreURL);
+      URL.revokeObjectURL(workerURL);
+      URL.revokeObjectURL(wasmURL);
     } catch (e) {
-      setLoadingMsg("Yükleme başarısız ❌",e);
+      console.log("Yükleme başarısız: ",e);
+      setLoadingMsg("Yükleme başarısız ❌");
     }
   }
 };
@@ -104,12 +108,14 @@ const convertFile = async () => {
   setProcessing(true);
   setProgress(0);
   setStatus("Processing");
-
+  const ffmpeg = ffmpegRef.current;
+  let inputName='';
+  let outputName='';
   try {
-    const ffmpeg = ffmpegRef.current;
+    
     const cleanFileName = file.name.replace(/[^\w.-]/g, '_');
-    const inputName = `input_${cleanFileName}`;
-    const outputName = `output_${Date.now()}.${selectedOutput}`;
+    inputName = `input_${cleanFileName}`;
+    outputName = `output_${Date.now()}.${selectedOutput}`;
     ffmpeg.off('progress');
     ffmpeg.on('progress', ({ progress }) => {
       if (progress >= 0 && progress <= 1) {
@@ -146,6 +152,9 @@ const convertFile = async () => {
     a.click();
     
     setStatus("Done");
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1000);
     await ffmpeg.deleteFile(inputName);
     await ffmpeg.deleteFile(outputName);
 
@@ -155,6 +164,15 @@ const convertFile = async () => {
     alert("Dönüştürme sırasında bir hata oluştu. Lütfen dosyanın çok büyük olmadığından emin olun.");
   } finally {
     setProcessing(false);
+    const cleanupMEMFS = async () => {
+      if (inputName) {
+        try { await ffmpeg.deleteFile(inputName); } catch { /* Sessizce geç */ }
+      }
+      if (outputName) {
+        try { await ffmpeg.deleteFile(outputName); } catch { /* Sessizce geç */ }
+      }
+    };
+    await cleanupMEMFS();
   }
 };
   const resetConverter = () => {
@@ -165,9 +183,23 @@ const convertFile = async () => {
     setSelectedOutput("");
   };
   useEffect(() => {
+    if (!window.crossOriginIsolated) {
+    console.warn(
+      "DIKKAT: Uygulama Cross-Origin Isolated modunda DEĞİL. " +
+      "SharedArrayBuffer kullanılamaz, FFmpeg tek çekirdekte (yavaş) çalışacaktır. " +
+      "Lütfen COOP ve COEP başlıklarını ayarlayın."
+    );
+  } else {
+    console.log("Sistem Cross-Origin Isolated modunda. Multi-threading aktif edilebilir.");
+  }
   return () => {
     if (ffmpegRef.current) {
       ffmpegRef.current.off('progress'); 
+      try {
+          ffmpegRef.current.terminate();
+        } catch {
+          console.warn("FFmpeg zaten kapalı veya sonlandırılamadı.");
+        }
     }
   };
 }, []);

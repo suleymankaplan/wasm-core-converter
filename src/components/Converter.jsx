@@ -1,19 +1,41 @@
 import { useState, useRef,useEffect } from "react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import './Converter.css'
 
 const FORMAT_MAP = {
-  'video/mp4': { formats: ['mp4', 'mkv', 'mov', 'avi', 'mp3', 'gif'], engine: 'ffmpeg' },
-  'video/quicktime': { formats: ['mov', 'mp4', 'mp3', 'avi', 'gif'], engine: 'ffmpeg' },
-  'audio/mpeg': { formats: ['mp3', 'wav', 'ogg', 'aac', 'flac'], engine: 'ffmpeg' },
-  'audio/wav': { formats: ['wav', 'mp3', 'ogg', 'flac'], engine: 'ffmpeg' },
-  'image/gif': { formats: ['mp4', 'webp', 'png'], engine: 'ffmpeg' },
-  'image/png': { formats: ['webp', 'jpg'], engine: 'canvas' },
-  'image/jpeg': { formats: ['webp', 'png'], engine: 'canvas' },
-  'image/webp': { formats: ['jpg', 'png'], engine: 'canvas' },
+  // --- VİDEO FORMATLARI ---
+  'video/mp4': { formats: ['mp4', 'mkv', 'mov', 'avi', 'flv', 'wmv', 'webm', 'mp3', 'gif'], engine: 'ffmpeg' },
+  'video/x-matroska': { formats: ['mp4', 'mkv', 'mov', 'avi', 'mp3', 'gif'], engine: 'ffmpeg' }, // MKV
+  'video/quicktime': { formats: ['mov', 'mp4', 'mkv', 'avi', 'mp3', 'gif'], engine: 'ffmpeg' }, // MOV
+  'video/x-msvideo': { formats: ['avi', 'mp4', 'mkv', 'mp3', 'gif'], engine: 'ffmpeg' }, // AVI
+  'video/x-flv': { formats: ['mp4', 'flv', 'avi'], engine: 'ffmpeg' },
+  'video/webm': { formats: ['mp4', 'webm', 'gif'], engine: 'ffmpeg' },
+
+  // --- SES FORMATLARI ---
+  'audio/mpeg': { formats: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'], engine: 'ffmpeg' }, // MP3
+  'audio/wav': { formats: ['wav', 'mp3', 'ogg', 'flac', 'm4a'], engine: 'ffmpeg' },
+  'audio/x-m4a': { formats: ['m4a', 'mp3', 'wav', 'flac'], engine: 'ffmpeg' },
+  'audio/ogg': { formats: ['ogg', 'mp3', 'wav', 'flac'], engine: 'ffmpeg' },
+  'audio/aac': { formats: ['aac', 'mp3', 'wav'], engine: 'ffmpeg' },
+
+  // --- RESİM & ANİMASYON ---
+  'image/gif': { formats: ['mp4', 'webp', 'png', 'mov'], engine: 'ffmpeg' },
+  'image/png': { formats: ['webp', 'jpg', 'png'], engine: 'canvas' },
+  'image/jpeg': { formats: ['webp', 'png', 'jpg'], engine: 'canvas' },
+  'image/webp': { formats: ['jpg', 'png', 'webp'], engine: 'canvas' },
+
+  // --- DOKÜMAN ---
   'application/pdf': { formats: ['jpg', 'png'], engine: 'pdfjs' }
 };
-
+const formatBytes = (bytes, decimals = 2) => {
+  if (bytes === 0) return '0 Bayt';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bayt', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
 const Converter = () => {
   const [file, setFile] = useState(null);
   const [allowedFormats, setAllowedFormats] = useState([]);
@@ -266,7 +288,7 @@ const convertFile = async () => {
       try {
         if (inputName) await ffmpeg.deleteFile(inputName);
         if (outputName) await ffmpeg.deleteFile(outputName);
-      } catch { /*  */ }
+      } catch { /* */ }
     }
   }
 };
@@ -309,85 +331,92 @@ const triggerDownload = (url, filename) => {
 }, []);
 
   return (
-    <div className="converter-container" style={{ textAlign: 'center', marginTop: '50px' }}>
-      <h2>WebAssembly Converter</h2>
+    <div className="converter-container">
+      {file&&(
+          <button className="change-file-button" onClick={resetConverter}>
+                X
+          </button>
+      )}
+      <h2 className="converter-title">WebAssembly Converter</h2>
       
       {/* Giriş Alanı */}
-      <div style={{ marginBottom: '20px' }}>
-        <input type="file" onChange={handleFileChange} disabled={processing} key={file ? 'active-upload' : 'new-upload'} />
-      </div>
+      
+        {!file&&(
+          <div className="file-input-wrapper">
+          <input type="file" className="file-input" onChange={handleFileChange} disabled={processing} />
+      </div>)}
+      
 
       {file && (
-        <div className="processing-zone" style={{ border: '1px solid #ddd', padding: '20px', borderRadius: '10px', display: 'inline-block' }}>
-          <p>Seçilen Dosya: <strong>{file.name}</strong></p>
+        
+        <div className="processing-zone">
+          <p className="file-info">
+            Seçilen Dosya: <strong className="file-name">{file.name}</strong>
+            <span className="file-size"> ({formatBytes(file.size)})</span>
+          </p>
           
-          <div style={{ marginBottom: '15px' }}>
-            <label>Dönüştürülecek Format: </label>
+          <div className="format-selector-wrapper">
+            <label className="format-label">Dönüştürülecek Format: </label>
             <select 
+              className="format-select"
               value={selectedOutput} 
               onChange={(e) => setSelectedOutput(e.target.value)}
               disabled={processing}
             >
               {allowedFormats.map(fmt => (
-                <option key={fmt} value={fmt}>{fmt.toUpperCase()}</option>
+                <option key={fmt} value={fmt} className="format-option">{fmt.toUpperCase()}</option>
               ))}
             </select>
           </div>
           {!activeEngine && loadProgress > 0 && (
-            <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #3498db', borderRadius: '8px' }}>
-              <p style={{ fontSize: '0.9rem', color: '#3498db' }}>
+            <div className="engine-load-status">
+              <p className="load-percentage">
                 Sistem Motoru İndiriliyor: %{loadProgress}
               </p>
-              <div style={{ width: '100%', backgroundColor: '#f0f0f0', height: '8px', borderRadius: '4px' }}>
-                <div style={{ 
-                  width: `${loadProgress}%`, 
-                  backgroundColor: '#3498db', 
-                  height: '100%', 
-                  transition: 'width 0.2s' 
-                }} />
+              <div className="load-progress-bar-wrapper">
+                <div 
+                  className="load-progress-bar"
+                  style={{ width: `${loadProgress}%` }} 
+                />
               </div>
-              <small style={{ color: '#888' }}>Bu işlem internet hızınıza bağlı olarak bir kez yapılacaktır.</small>
+              <small className="load-note">Bu işlem internet hızınıza bağlı olarak bir kez yapılacaktır.</small>
             </div>
           )}
-          <p style={{ fontSize: '0.85rem', color: '#555' }}>{loadingMsg}</p>
+          <p className="loading-message">{loadingMsg}</p>
 
           <button 
+            className={`convert-button ${!activeEngine || processing ||status=='Done'? 'disabled' : 'active'}`}
             onClick={convertFile} 
-            disabled={!activeEngine || processing}
-            style={{ padding: '10px 20px', backgroundColor: activeEngine ? '#4CAF50' : '#ccc', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+            disabled={!activeEngine || processing||status=='Done'}
           >
+            
             {processing ? 'Dönüştürülüyor...' : 'İşlemi Başlat'}
           </button>
-          <div style={{ width: '100%', marginTop: '20px' }}>
-            <p>
+          <div className="operation-status-wrapper">
+            <p className="status-text">
               {status==="Processing"&&`Dönüştürülüyor %${progress}`}
               {status==="Finalizing"&&'Dosya hazırlanıyor...'}
               {status==="Downloading"&&"İndirme başlatılıyor..."}
               {status==="Done"&&"İndirme başarılı"}
             </p>
-            <div style={{ 
-              width: '100%', 
-              backgroundColor: '#e0e0e0', 
-              borderRadius: '10px', 
-              height: '10px',
-              overflow: 'hidden' 
-            }}>
-              <div style={{ 
-                width: `${progress}%`,
-                transition: 'width 0.3s ease',
-                backgroundColor: status==="Done"?'#747474':'#4caf50', 
-                height: '100%'
-              }} />
+            {(status!='Done'&&status!="")&&(
+              <div className="operation-progress-bar-wrapper">
+              <div 
+                className={`operation-progress-bar ${status === "Done" ? 'done' : 'processing'}`}
+                style={{ width: `${progress}%` }} 
+              />
             </div>
+            )}
+            
           </div>
           {status==="Done"&&(
-            <button onClick={resetConverter} style={{ padding: '10px 20px', backgroundColor:'#4CAF50', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', margin: '10px'}}>Daha fazla dönüştür</button>
+            <button className="reset-button" onClick={resetConverter}>Daha fazla dönüştür</button>
           )}
           
         </div>
       )}
 
-      <footer style={{ marginTop: '30px', color: '#888', fontSize: '0.8rem' }}>
+      <footer className="converter-footer">
         🔒 Dosyalarınız sunucuya gönderilmez, işlem tarayıcınızda yapılır.
       </footer>
     </div>

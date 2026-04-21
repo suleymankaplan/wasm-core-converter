@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Wasm Converter</string>
+    <string name="title_activity_main">Wasm Converter</string>
+    <string name="package_name">com.suleymankaplan.wasmconverter</string>
+    <string name="custom_url_scheme">com.suleymankaplan.wasmconverter</string>
+</resources>

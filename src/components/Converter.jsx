@@ -3,6 +3,10 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import './Converter.css'
 
+import { Share } from '@capacitor/share';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
+
 const FORMAT_MAP = {
   // --- VİDEO FORMATLARI ---
   'video/mp4': { formats: ['mp4', 'mkv', 'mov', 'avi', 'flv', 'wmv', 'webm', 'mp3', 'gif'], engine: 'ffmpeg' },
@@ -293,13 +297,41 @@ const convertFile = async () => {
   }
 };
 
-const triggerDownload = (url, filename) => {
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `converted_${filename}`;
-  a.click();
+const triggerDownload = async (url, filename) => {
   setStatus("Done");
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  // MOBİL KONTROLÜ
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        const base64Data = reader.result;
+
+        const savedFile = await Filesystem.writeFile({
+          path: filename,
+          data: base64Data,
+          directory: Directory.Cache
+        });
+
+        await Share.share({
+          title: 'Dosyan Hazır!',
+          url: savedFile.uri,
+        });
+      };
+    } catch (error) {
+      console.error("Mobil paylaşım hatası:", error);
+    }
+  } else {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `converted_${filename}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 };
   const resetConverter = () => {
     setFile(null);
@@ -415,7 +447,6 @@ const triggerDownload = (url, filename) => {
           
         </div>
       )}
-
       <footer className="converter-footer">
         🔒 Dosyalarınız sunucuya gönderilmez, işlem tarayıcınızda yapılır.
       </footer>

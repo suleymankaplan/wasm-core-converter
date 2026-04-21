@@ -1,0 +1,5 @@
+{
+  "appId": "com.suleymankaplan.wasmconverter",
+  "appName": "Wasm Converter",
+  "webDir": "dist"
+}

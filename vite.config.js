@@ -6,7 +6,7 @@ import postCssPxToRem from 'postcss-pxtorem'
 export default defineConfig({
   plugins: [react()],
 
-  base:'./',
+  base:'/wasm-core-converter',
   build:{
     outDir:'dist',
   },

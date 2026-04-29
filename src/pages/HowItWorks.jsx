@@ -2,7 +2,7 @@ import React from 'react';
 
 const HowItWorks = () => {
   return (
-    <div style={{ padding: '40px', maxWidth: '850px', margin: '0 auto', lineHeight: '1.6', color: '#333' }}>
+    <div style={{ padding: '40px', maxWidth: '850px', margin: '0 auto', lineHeight: '1.6', color: '#333'}}>
       
       <header style={{ textAlign: 'center', marginBottom: '40px' }}>
         <h2 style={{ fontSize: '2rem', color: '#2c3e50' }}>Sistem Nasıl Çalışır? ⚙️</h2>

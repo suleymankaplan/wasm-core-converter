@@ -4,6 +4,8 @@ import Navbar from './components/Navbar';
 import { Capacitor } from '@capacitor/core';
 import HowItWorks from './pages/HowItWorks';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import BottomNav from './components/BottomNav';
+import History from './pages/History'
 const Converter = lazy(() => import('./components/Converter'));
 
 function App() {
@@ -12,11 +14,7 @@ function App() {
     <div className={`App ${isMobile?'is-mobile':''}`}>
       <BrowserRouter>
         <div className="app-container">
-          {!isMobile&&(
-            <Navbar />
-          )} 
-          
-
+          <Navbar />
           <main className="main-content">
             <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}>Sistem Yükleniyor, Lütfen Bekleyin... ⚡</div>}>
               <Routes>
@@ -25,22 +23,13 @@ function App() {
                 <Route path="/nasil-calisir" element={<HowItWorks />} />
                 
                 <Route path="/gizlilik" element={<PrivacyPolicy/>} />
+                <Route path='/gecmis' element={<History/>}/>
               </Routes>
             </Suspense>
           </main>
-          {/* {isMobile && (
-            <nav className="bottom-nav">
-              <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                <span className="nav-icon">🔄</span>
-                <span className="nav-label">Dönüştür</span>
-              </NavLink>
-              
-              <NavLink to="/gecmis" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                <span className="nav-icon">📜</span>
-                <span className="nav-label">Geçmiş</span>
-              </NavLink>
-            </nav>
-          )} */}
+          {isMobile&&(
+            <BottomNav/>
+          )}
         </div>
       </BrowserRouter>
     </div>

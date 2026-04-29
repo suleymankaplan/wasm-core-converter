@@ -10,6 +10,9 @@ body{
     font-family: sans-serif;
 }
 
+.is-mobile .main-content{
+  padding-bottom: calc(80px+env(safe-area-inset-bottom));
+}
 .is-mobile * {
   -webkit-user-select: none;
   -webkit-touch-callout: none;

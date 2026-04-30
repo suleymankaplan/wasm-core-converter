@@ -1,1 +1,0 @@
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/wasm-core-converter/dev-sw.js?dev-sw', { scope: '/wasm-core-converter/', type: 'classic' })

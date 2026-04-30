@@ -2,10 +2,11 @@ import { useState, useRef,useEffect } from "react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import './Converter.css'
-
+import heic2any from "heic2any";
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import OfflineManager from "./OfflineManager";
 
 const FORMAT_MAP = {
   // --- VİDEO FORMATLARI ---
@@ -28,6 +29,10 @@ const FORMAT_MAP = {
   'image/png': { formats: ['webp', 'jpg', 'png'], engine: 'canvas' },
   'image/jpeg': { formats: ['webp', 'png', 'jpg'], engine: 'canvas' },
   'image/webp': { formats: ['jpg', 'png', 'webp'], engine: 'canvas' },
+
+  // --- APPLE FORMATLARI ---
+  'image/heic': { formats: ['jpg', 'png', 'webp'], engine: 'heic2any' },
+  'image/heif': { formats: ['jpg', 'png', 'webp'], engine: 'heic2any' },
 
   // --- DOKÜMAN ---
   'application/pdf': { formats: ['jpg', 'png'], engine: 'pdfjs' }
@@ -59,7 +64,7 @@ const loadSpecificEngine = async (type) => {
   setLoadProgress(0);
 
   if (type === "ffmpeg") {
-    const baseURL = window.location.origin + '/ffmpeg';
+    const baseURL = import.meta.env.BASE_URL + 'ffmpeg';
     const ffmpeg = ffmpegRef.current;
 
     const downloadWithProgress = async (url) => {
@@ -111,32 +116,49 @@ const loadSpecificEngine = async (type) => {
     setActiveEngine("canvas");
     setLoadingMsg("Resim Motoru Hazır! 🖼️ (Native Edge)");
   }
-else if (type === "pdfjs") {
-      try {
-        const scripts = [
-          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-          'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
-        ];
-
-        for (const src of scripts) {
-          if (!document.querySelector(`script[src="${src}"]`)) {
-            const script = document.createElement('script');
-            script.src = src;
-            script.async = false;
-            document.body.appendChild(script);
-          }
-        }
-        setTimeout(() => {
-          if (window.pdfjsLib) {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-            setActiveEngine("pdfjs");
-            setLoadingMsg("PDF & ZIP Motoru Hazır! 📄📦");
-          }
-        }, 1000);
-      } catch {
-        setLoadingMsg("PDF Motoru yüklenemedi ❌");
-      }
+  else if (type === "heic2any") {
+      setActiveEngine("heic2any");
+      setLoadingMsg("HEIC Apple Motoru Hazır! 🍏 (WASM)");
     }
+  else if (type === "pdfjs") {
+    try {
+      // Vite'ın base URL'ini alıyoruz (Örn: /wasm-core-converter/ veya /)
+      const baseUrl = import.meta.env.BASE_URL;
+      
+      const scripts = [
+        `${baseUrl}pdfjs/pdf.min.js`,
+        `${baseUrl}pdfjs/jszip.min.js`
+      ];
+
+      const loadScript = (src) => {
+        return new Promise((resolve, reject) => {
+          if (document.querySelector(`script[src="${src}"]`)) {
+            resolve();
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = resolve;
+          script.onerror = reject;
+          document.body.appendChild(script);
+        });
+      };
+
+      Promise.all(scripts.map(loadScript)).then(() => {
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = `${baseUrl}pdfjs/pdf.worker.min.js`;
+          setActiveEngine("pdfjs");
+          setLoadingMsg("PDF & ZIP Motoru Hazır! 📄📦");
+        }
+      }).catch(() => {
+        setLoadingMsg("Kütüphane dosyaları bulunamadı ❌");
+      });
+
+    } catch (error) {
+      console.error("PDF Motoru hatası:", error);
+      setLoadingMsg("PDF Motoru yüklenemedi ❌");
+    }
+  }
 };
 const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -147,8 +169,13 @@ const handleFileChange = (e) => {
     setProgress(0);
     setStatus("");
 
-    const type = selectedFile.type;
+    let type = selectedFile.type;
     const inputExtension = selectedFile.name.split('.').pop().toLowerCase();
+    if (!type || type === '' || type === 'application/octet-stream') {
+      if (inputExtension === 'heic' || inputExtension === 'heif') {
+        type = 'image/heic';
+      }
+    }
     let config = FORMAT_MAP[type];
     if (!config) {
       if (type.startsWith('video/') || type.startsWith('audio/')) {
@@ -243,8 +270,26 @@ const convertFile = async () => {
           URL.revokeObjectURL(img.src);
         }, targetMime, 0.9);
       };
+      
+    } else if (activeEngine === "heic2any") {
+        setProgress(30);
+        const targetMime = selectedOutput === 'jpg' ? 'image/jpeg' : `image/${selectedOutput}`;
+        
+        const conversionResult = await heic2any({
+          blob: file,
+          toType: targetMime,
+          quality: 0.9,
+        });
 
-    } else if (activeEngine === "pdfjs") {
+        setProgress(80);
+        
+        const finalBlob = Array.isArray(conversionResult) ? conversionResult[0] : conversionResult;
+        
+        const url = URL.createObjectURL(finalBlob);
+        triggerDownload(url, outputName);
+        setProgress(100);
+
+      } else if (activeEngine === "pdfjs") {
       const fileReader = new FileReader();
       fileReader.onload = async function() {
         const typedarray = new Uint8Array(this.result);
@@ -363,6 +408,8 @@ const triggerDownload = async (url, filename) => {
 }, []);
 
   return (
+    <>
+    <OfflineManager/>
     <div className="converter-container">
       {file&&(
           <button className="change-file-button" onClick={resetConverter}>
@@ -370,9 +417,9 @@ const triggerDownload = async (url, filename) => {
           </button>
       )}
       <h2 className="converter-title">WebAssembly Converter</h2>
-      
+        
       {/* Giriş Alanı */}
-      
+
         {!file&&(
           <div className="file-input-wrapper">
           <input type="file" className="file-input" onChange={handleFileChange} disabled={processing} />
@@ -451,6 +498,7 @@ const triggerDownload = async (url, filename) => {
         🔒 Dosyalarınız sunucuya gönderilmez, işlem tarayıcınızda yapılır.
       </footer>
     </div>
+    </>
   );   
 }
 

@@ -12,7 +12,7 @@ function App() {
   const [isMobile] = useState(() => Capacitor.isNativePlatform());
   return (
     <div className={`App ${isMobile?'is-mobile':''}`}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}> 
         <div className="app-container">
           <Navbar />
           <main className="main-content">

@@ -10,10 +10,8 @@ function OfflineManager() {
   } = useRegisterSW();
 
   const [downloadProgress, setDownloadProgress] = useState(0);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
 
-  // 1. MEVCUT DURUMU KONTROL ET
   useEffect(() => {
     async function verifyCache() {
       try {
@@ -23,7 +21,6 @@ function OfflineManager() {
         if (hasCache) {
           const cache = await caches.open(cacheNames.find(n => n.includes('workbox-precache')));
           const requests = await cache.keys();
-          // Eğer 5'ten fazla dosya varsa inmiş kabul et
           if (requests.length > 5) {
             setOfflineReady(true);
           }
@@ -37,81 +34,61 @@ function OfflineManager() {
     verifyCache();
   }, [setOfflineReady]);
 
-  // 2. %99 TAKILMASINI ÇÖZEN BAR MANTIĞI
   useEffect(() => {
     let interval;
-    if (isDownloading && downloadProgress < 99) {
+    if (!isVerifying && !offlineReady && downloadProgress < 99) {
       interval = setInterval(() => {
-        setDownloadProgress((prev) => (prev < 95 ? prev + 3 : 99));
-      }, 200);
+        setDownloadProgress((prev) => (prev < 95 ? prev + 4 : 99));
+      }, 250);
     } 
 
-    // KRİTİK: Eğer %99'da takılırsa 2 saniye sonra Cache'i manuel kontrol et
-    if (isDownloading && downloadProgress === 99 && !offlineReady) {
+    if (!isVerifying && !offlineReady && downloadProgress === 99) {
       const forceCheck = setTimeout(async () => {
         const cacheNames = await caches.keys();
         if (cacheNames.some(name => name.includes('workbox-precache'))) {
-          // Dosyalar oradaysa SW'den offlineReady gelmese bile hazır yap
           setOfflineReady(true);
-          console.log("Sistem hazır, %99 takılması aşıldı.");
         }
       }, 2000); 
       return () => clearTimeout(forceCheck);
     }
     
-    // İşlem bittiğinde
-    if (offlineReady && isDownloading) {
+    if (offlineReady) {
       setDownloadProgress(100);
-      const timer = setTimeout(() => setIsDownloading(false), 800);
-      return () => clearTimeout(timer);
     }
 
     return () => clearInterval(interval);
-  }, [isDownloading, downloadProgress, offlineReady, setOfflineReady]);
+  }, [isVerifying, offlineReady, downloadProgress, setOfflineReady]);
 
-  const handleDownloadCore = () => {
+  useEffect(() => {
     if (needRefresh) {
       updateServiceWorker(true);
-    } else {
-      setIsDownloading(true);
-      // PWA zaten arka planda inmeye başladı, biz sadece görseli başlattık
     }
-  };
+  }, [needRefresh, updateServiceWorker]);
 
   if (isVerifying) return null;
 
   return (
     <div className="pwa-status-card">
-      {!offlineReady && (
-        <>
-          <p className="pwa-description">
-            Tüm dönüşüm motorunu yerel tarayıcınıza indirin. İndirme bittikten sonra internetinizi kapatıp güvenle devam edebilirsiniz.
+      {!offlineReady ? (
+        <div className="pwa-progress-container">
+          <p className="pwa-description" style={{ marginBottom: '12px', fontWeight: '500' }}>
+            ⚙️ Dönüşüm motoru arka planda cihazınıza kuruluyor...
           </p>
-          {!isDownloading ? (
-            <button className="pwa-download-btn" onClick={handleDownloadCore}>
-              Motoru ve Kütüphaneleri İndir
-            </button>
-          ) : (
-            <div className="pwa-progress-container">
-              <div className="pwa-progress-bar-bg">
-                <div 
-                  className="pwa-progress-bar-fill" 
-                  style={{ width: `${downloadProgress}%` }}
-                ></div>
-              </div>
-              <p className="pwa-progress-text">
-                {downloadProgress < 100 
-                  ? `Motor dosyaları önbelleğe alınıyor... %${downloadProgress}`
-                  : "Kurulum tamamlanıyor..."}
-              </p>
-            </div>
-          )}
-        </>
-      )}
-
-      {offlineReady && (
+          <div className="pwa-progress-bar-bg">
+            <div 
+              className="pwa-progress-bar-fill" 
+              style={{ width: `${downloadProgress}%` }}
+            ></div>
+          </div>
+          <p className="pwa-progress-text" style={{ marginTop: '8px', fontSize: '0.9em' }}>
+            {downloadProgress < 100 
+              ? `Kütüphaneler indiriliyor... %${downloadProgress}`
+              : "Kurulum tamamlanıyor..."}
+          </p>
+        </div>
+      ) : (
         <div className="pwa-success-message">
-          ✅ Sistem Çevrimdışı Hazır! Cihazınızda yerel olarak çalışıyor.
+          ✅ Çevrimdışı Mod Hazır! İnternetsiz çalışabilirsiniz.
         </div>
       )}
     </div>

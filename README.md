@@ -1,16 +1,37 @@
-# React + Vite
+# WebAssembly (WASM) Core Converter 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+WASM Core Converter, tarayıcı üzerinde çalışan, %100 gizlilik odaklı, sunucusuz ve çevrimdışı (offline-first) evrensel bir dosya dönüştürme aracıdır. Tüm işlemler, bulut sunucuları yerine doğrudan kullanıcının cihaz donanımı kullanılarak istemci tarafında (client-side) gerçekleştirilir.
 
-Currently, two official plugins are available:
+## ✨ Öne Çıkan Özellikler
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+*   🔒 **Tam Gizlilik:** Dosyalarınız hiçbir sunucuya yüklenmez. Tüm veri işleme süreci yerel tarayıcınızda başlar ve biter.
+*   🍏 **Apple HEIC/HEIF Desteği:** İstemci tarafında `heic2any` (WASM) entegrasyonu sayesinde, iOS cihazlardan gelen inatçı formatları saniyeler içinde yerel olarak JPG/PNG'ye dönüştürür.
+*   📄 **Gelişmiş PDF İşleme:** `pdf.js` motoru ile çok sayfalı PDF'ler taranır, her sayfa yüksek çözünürlüklü görsele çevrilir ve `jszip` ile tek bir ZIP dosyası olarak kullanıcıya sunulur.
+*   📶 **Çevrimdışı Çalışma (PWA):** Vite-PWA ve Service Worker mimarisi sayesinde, dönüştürme motorları (yaklaşık 37 MB) ilk ziyarette arka planda (hayalet mod) cihaz belleğine alınır. Uygulama bir daha asla internet bağlantısına ihtiyaç duymaz.
 
-## React Compiler
+## 🛠️ Kullanılan Teknolojiler
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+*   **Frontend:** React, Vite, CSS3
+*   **WebAssembly Motorları:** `@ffmpeg/ffmpeg`, `heic2any`
+*   **Edge/Native Kütüphaneler:** HTML5 Canvas (Hızlı resim işleme), `pdf.js`, `jszip`
+*   **Çevrimdışı Mimari:** Vite PWA (`vite-plugin-pwa`), Workbox
 
-## Expanding the ESLint configuration
+## 🚀 Kurulum ve Çalıştırma
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Projeyi GitHub Pages ortamında görmek için:
+    https://suleymankaplan.github.io/wasm-core-converter/
+
+Projeyi yerel ortamınızda çalıştırmak için aşağıdaki adımları izleyin:
+
+### 1. Bağımlılıkları Yükleyin
+*(Not: Proje Vite 8 kullandığı için PWA eklentisi ile oluşabilecek eş bağımlılık çakışmalarını önlemek adına `--legacy-peer-deps` bayrağı gereklidir.)*
+    npm install --legacy-peer-deps
+### 2. Geliştirme Sunucusunu Başlatın
+    npm run dev
+### 3. Çevrimdışı Modu (PWA) Test Etmek İçin Üretim Derlemesi
+Geliştirme modunda Service Worker devre dışı bırakılmıştır. PWA ve önbellek özelliklerini test etmek için projeyi derleyin ve önizleme alın:
+    npm run build
+    npm run preview
+## 👨‍💻 Geliştirici
+    Süleyman Kaplan
+    Computer Engineering
